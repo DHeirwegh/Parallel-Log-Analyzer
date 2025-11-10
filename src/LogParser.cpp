@@ -17,35 +17,76 @@ std::vector<std::string> split(const std::string &s, char delimiter)
 
 std::optional<LogEntry> parseLine(const std::string &line)
 {
-    std::vector<std::string> tokens = split(line, '|');
+    // Expect exactly9 fields separated by '|'
+    const char* data = line.data();
+    const size_t n = line.size();
 
-    if (tokens.size() != 9)
+    size_t fieldIndex = 0;
+    size_t start = 0;
+
+    LogEntry entry; // we'll fill as we go
+
+    auto commitField = [&](size_t idx, size_t s, size_t e) -> bool {
+        const char* b = data + s;
+        const char* t = data + e;
+        const size_t len = static_cast<size_t>(t - b);
+
+        // All fields must be present (non-empty)
+        if (len == 0)
+            return false;
+        switch (idx)
+        {
+        case 0:
+            entry.timestamp.assign(b, len);
+            break;
+        case 1:
+            entry.logLevel.assign(b, len);
+            break;
+        case 2:
+            entry.requestId.assign(b, len);
+            break;
+        case 3:
+            entry.sourceIp.assign(b, len);
+            break;
+        case 4:
+            entry.httpMethod.assign(b, len);
+            break;
+        case 5:
+            entry.endpoint.assign(b, len);
+            break;
+        case 6:
+            entry.statusCode = std::stoi(std::string(b, len));
+            break;
+        case 7:
+            entry.responseTimeMs = std::stoi(std::string(b, len));
+            break;
+        case 8:
+            entry.message.assign(b, len);
+            break;
+        default:
+            return false; // too many fields
+        }
+        return true;
+        };
+
+    for (size_t i = 0; i <= n; ++i)
     {
-        return std::nullopt; // Malformed line
+        if (i == n || data[i] == '|')
+        {
+            // token is [start, i)
+            if (!commitField(fieldIndex, start, i))
+                return std::nullopt;
+            ++fieldIndex;
+            start = i + 1;
+        }
     }
 
-    try
+    if (fieldIndex != 9)
     {
-        LogEntry entry;
-        entry.timestamp = tokens[0];
-        entry.logLevel = tokens[1];
-        entry.requestId = tokens[2];
-        entry.sourceIp = tokens[3];
-        entry.httpMethod = tokens[4];
-        entry.endpoint = tokens[5];
-        entry.statusCode = std::stoi(tokens[6]);
-        entry.responseTimeMs = std::stoi(tokens[7]);
-        entry.message = tokens[8];
-        return entry;
-    }
-    catch (const std::invalid_argument &e)
-    {
-        // Handle cases where stoi fails
+        // malformed (too few or too many fields)
         return std::nullopt;
     }
-    catch (const std::out_of_range &e)
-    {
-        // Handle cases where stoi result is out of range
-        return std::nullopt;
-    }
+   
+    return entry;
+
 }
