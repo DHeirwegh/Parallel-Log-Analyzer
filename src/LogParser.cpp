@@ -3,17 +3,24 @@
 #include <sstream>
 #include <vector>
 
-std::vector<std::string> split(const std::string &s, char delimiter)
+bool parse_int(const char* begin, const char* end, int& out)
 {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::istringstream tokenStream(s);
-    while (std::getline(tokenStream, token, delimiter))
+    if (begin == end)
+        return false; // empty
+    long long value = 0;
+    for (const char* p = begin; p < end; ++p)
     {
-        tokens.push_back(token);
+        unsigned char c = static_cast<unsigned char>(*p);
+        if (c < '0' || c > '9')
+            return false;
+        value = value * 10 + (c - '0');
+        if (value > std::numeric_limits<int>::max())
+            return false;
     }
-    return tokens;
+    out = static_cast<int>(value);
+    return true;
 }
+
 
 std::optional<LogEntry> parseLine(const std::string &line)
 {
@@ -55,10 +62,12 @@ std::optional<LogEntry> parseLine(const std::string &line)
             entry.endpoint.assign(b, len);
             break;
         case 6:
-            entry.statusCode = std::stoi(std::string(b, len));
+            if(!parse_int(b, t, entry.statusCode))
+				return false;
             break;
         case 7:
-            entry.responseTimeMs = std::stoi(std::string(b, len));
+            if (!parse_int(b,t,entry.responseTimeMs))
+                return false;
             break;
         case 8:
             entry.message.assign(b, len);
